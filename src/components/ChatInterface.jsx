@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Sparkles } from 'lucide-react';
+import { Send, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { sendMessageToGemini } from '../lib/gemini';
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState([
-    { id: 1, sender: 'bot', text: "Hi! I'm your learning companion. I've prepared your plan. Ready to get started?" }
+    { role: 'assistant', content: "Hi! I'm your learning companion. I can help answer questions about your plan or explain concepts. What are we working on?" }
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -18,21 +20,29 @@ export default function ChatInterface() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
-    const userMsg = { id: Date.now(), sender: 'user', text: input };
-    setMessages(prev => [...prev, userMsg]);
+    const userMessage = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setIsLoading(true);
 
-    // Mock bot response
-    setTimeout(() => {
-      const botMsg = { 
-        id: Date.now() + 1, 
-        sender: 'bot', 
-        text: "That sounds great! Keep going. Use the checkboxes to track your progress." 
-      };
-      setMessages(prev => [...prev, botMsg]);
-    }, 1000);
+    try {
+        // Pass current history (excluding the new user message we just added for UI, 
+        // but the service handles appending it effectively via startChat or we pass it all)
+        // Actually, let's pass the history *excluding* the one we just sent, 
+        // and let the service call sendMessage with the new input.
+        // Wait, the service wrapper I designed takes (history, message). 
+        // Let's pass the *previous* messages as history.
+        const responseText = await sendMessageToGemini(messages, input);
+        
+        setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+    } catch (error) {
+        console.error("Gemini Error:", error);
+        setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my brain right now. Please check your API key." }]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -43,7 +53,7 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-neutral-900 border-l border-neutral-800">
+    <div className="h-full flex flex-col">
       <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
         <div className="flex items-center space-x-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
@@ -66,10 +76,18 @@ export default function ChatInterface() {
                 ? "bg-blue-600 text-white rounded-br-none" 
                 : "bg-neutral-800 text-neutral-200 rounded-bl-none"
             )}>
-              {msg.text}
+              {msg.content}
             </div>
           </div>
         ))}
+        {isLoading && (
+            <div className="flex justify-start">
+                <div className="bg-neutral-800 text-neutral-200 rounded-2xl rounded-tl-sm px-4 py-2 flex items-center space-x-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                    <span className="text-sm">Thinking...</span>
+                </div>
+            </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
