@@ -76,7 +76,7 @@ export default function Dashboard({ userProfile, plan: initialPlan }) {
             "md:bg-neutral-900/80 md:backdrop-blur-sm md:rounded-3xl md:border md:border-neutral-800 md:shadow-2xl md:ml-6"
           )}
         >
-          <ChatInterface />
+          <ChatInterface plan={plan} />
         </div>
 
       </div>

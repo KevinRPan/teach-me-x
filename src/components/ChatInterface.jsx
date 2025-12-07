@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '../lib/utils';
 import { sendMessageToGemini } from '../lib/gemini';
 
-export default function ChatInterface() {
+export default function ChatInterface({ plan }) {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: "Hi! I'm your learning companion. I can help answer questions about your plan or explain concepts. What are we working on?" }
   ]);
@@ -28,13 +30,7 @@ export default function ChatInterface() {
     setIsLoading(true);
 
     try {
-        // Pass current history (excluding the new user message we just added for UI, 
-        // but the service handles appending it effectively via startChat or we pass it all)
-        // Actually, let's pass the history *excluding* the one we just sent, 
-        // and let the service call sendMessage with the new input.
-        // Wait, the service wrapper I designed takes (history, message). 
-        // Let's pass the *previous* messages as history.
-        const responseText = await sendMessageToGemini(messages, input);
+        const responseText = await sendMessageToGemini(messages, input, plan);
         
         setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
     } catch (error) {
@@ -62,21 +58,37 @@ export default function ChatInterface() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
+        {messages.map((msg, index) => (
           <div 
-            key={msg.id} 
+            key={index} 
             className={cn(
               "flex w-full",
-              msg.sender === 'user' ? "justify-end" : "justify-start"
+              msg.role === 'user' ? "justify-end" : "justify-start"
             )}
           >
             <div className={cn(
-              "max-w-[80%] rounded-2xl px-4 py-3 text-sm",
-              msg.sender === 'user' 
+              "max-w-[80%] rounded-2xl px-4 py-3 text-sm overflow-hidden",
+              msg.role === 'user' 
                 ? "bg-blue-600 text-white rounded-br-none" 
                 : "bg-neutral-800 text-neutral-200 rounded-bl-none"
             )}>
-              {msg.content}
+              {msg.role === 'user' ? (
+                 <p>{msg.content}</p>
+              ) : (
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  className="prose prose-sm prose-invert max-w-none break-words"
+                  components={{
+                      a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" />,
+                      pre: ({node, ...props}) => <div className="not-prose my-2 bg-black/30 p-3 rounded-lg overflow-x-auto"><pre {...props} className="bg-transparent p-0 m-0" /></div>,
+                      code: ({node, inline, ...props}) => inline 
+                        ? <code {...props} className="bg-black/30 px-1.5 py-0.5 rounded font-mono text-xs" />
+                        : <code {...props} className="bg-transparent p-0 text-sm font-mono" />
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         ))}

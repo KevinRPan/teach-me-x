@@ -10,7 +10,7 @@ if (API_KEY) {
   model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 }
 
-export const sendMessageToGemini = async (history, message) => {
+export const sendMessageToGemini = async (history, message, planContext = null) => {
   if (!model) {
     throw new Error("Gemini API Key is missing. Please add VITE_GEMINI_API_KEY to your .env file.");
   }
@@ -27,7 +27,22 @@ export const sendMessageToGemini = async (history, message) => {
   const firstUserIndex = formattedHistory.findIndex(msg => msg.role === 'user');
   
   // If no user messages yet, or if model messages come before the first user message, cleanup:
-  const validHistory = firstUserIndex !== -1 ? formattedHistory.slice(firstUserIndex) : [];
+  let validHistory = firstUserIndex !== -1 ? formattedHistory.slice(firstUserIndex) : [];
+
+  // Inject Plan Context if available
+  if (planContext) {
+    const contextMessage = {
+      role: 'user',
+      parts: [{ text: `System Context: The user is following this learning plan. Use it to answer questions contextually.\n\n${JSON.stringify(planContext)}` }]
+    };
+    const ackMessage = {
+      role: 'model',
+      parts: [{ text: "Understood. I will use this learning plan to guide my responses." }]
+    };
+    
+    // Prepend context and ack to the valid history
+    validHistory = [contextMessage, ackMessage, ...validHistory];
+  }
 
   const chat = model.startChat({
     history: validHistory,
