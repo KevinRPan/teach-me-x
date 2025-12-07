@@ -14,7 +14,7 @@ export default function PlanView({ plan, onToggleStep, collapsed = false, onExpa
       <div className="h-full flex flex-col items-center py-6 cursor-pointer hover:bg-white/5 transition-colors group" onClick={onExpand}>
          {/* Minimal Header */}
          <div className="mb-6 flex flex-col items-center space-y-2">
-            <span className="text-[10px] font-mono text-neutral-500 uppercase rotate-180 writing-mode-vertical">Plan</span>
+            <span className="text-[10px] font-mono text-neutral-500 uppercase writing-mode-vertical">Plan</span>
             <div className="w-1 h-8 bg-neutral-800 rounded-full overflow-hidden">
                  <div className="w-full bg-blue-500 transition-all duration-500" style={{ height: `${progress * 100}%` }} />
             </div>
