@@ -3,28 +3,45 @@ import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import PlanReview from './components/PlanReview';
 import PlanRevision from './components/PlanRevision';
-import { generateLearningPlan, reviseLearningPlan } from './lib/gemini';
+import PathwaysSelection from './components/PathwaysSelection';
+import { generateLearningPlan, generateLearningPathways, reviseLearningPlan } from './lib/gemini';
 import LoadingScreen from './components/LoadingScreen';
 
 function App() {
-  const [view, setView] = useState('onboarding'); // 'onboarding' | 'generating' | 'review' | 'revising' | 'revising-loading' | 'dashboard'
+  const [view, setView] = useState('onboarding'); // 'onboarding' | 'generating-pathways' | 'pathways' | 'generating-plan' | 'review' | 'revising' | 'revising-loading' | 'dashboard'
   const [userProfile, setUserProfile] = useState(null);
+  const [pathways, setPathways] = useState([]);
+  const [selectedPathways, setSelectedPathways] = useState([]);
   const [plan, setPlan] = useState(null);
   const [hasRevised, setHasRevised] = useState(false);
 
   const handleOnboardingComplete = async (profile) => {
     setUserProfile(profile);
-    setView('generating');
+    setView('generating-pathways');
     
     try {
-      const generatedPlan = await generateLearningPlan(profile);
+      const generatedPathways = await generateLearningPathways(profile);
+      setPathways(generatedPathways);
+      setView('pathways');
+    } catch (error) {
+      console.error("Failed to generate pathways", error);
+      alert("Something went wrong brainstorming pathways. Please check your API key.");
+      setView('onboarding');
+    }
+  };
+
+  const handlePathwaysConfirm = async (selected) => {
+    setSelectedPathways(selected);
+    setView('generating-plan');
+
+    try {
+      const generatedPlan = await generateLearningPlan(userProfile, selected);
       setPlan(generatedPlan);
       setView('review');
     } catch (error) {
       console.error("Failed to generate plan", error);
-      // Optional: Show error state or fallback
-      alert("Something went wrong generating the plan. Please check your API key.");
-      setView('onboarding');
+      alert("Something went wrong generating the plan.");
+      setView('pathways');
     }
   };
 
@@ -52,7 +69,22 @@ function App() {
     }
   };
 
-  if (view === 'generating') {
+  if (view === 'generating-pathways') {
+    return (
+      <LoadingScreen topic={userProfile?.topic} />
+    );
+  }
+
+  if (view === 'pathways') {
+    return (
+      <PathwaysSelection 
+        pathways={pathways} 
+        onConfirm={handlePathwaysConfirm} 
+      />
+    );
+  }
+
+  if (view === 'generating-plan') {
     return (
       <LoadingScreen topic={userProfile?.topic} />
     );

@@ -53,10 +53,14 @@ export const sendMessageToGemini = async (history, message, planContext = null) 
   return response.text();
 };
 
-export const generateLearningPlan = async (userProfile) => {
+export const generateLearningPlan = async (userProfile, selectedPathways = []) => {
   if (!model) {
     throw new Error("Gemini API Key is missing.");
   }
+
+  const pathwayContext = selectedPathways.length > 0 
+    ? `The user has chosen to focus on these specific learning pathways/directions: ${selectedPathways.join(", ")}. Ensure the curriculum heavily emphasizes these areas.`
+    : "";
 
   const prompt = `
     You are an expert curriculum designer. Create a 7-day learning plan for:
@@ -64,6 +68,8 @@ export const generateLearningPlan = async (userProfile) => {
     - Level: ${userProfile.level}
     - Time per day: ${userProfile.timeCommitment}
     - Goal/Motivation: ${userProfile.motivation}
+    
+    ${pathwayContext}
 
     Return ONLY raw JSON (no markdown formatting, no code blocks) with this exact structure:
     {
@@ -101,6 +107,41 @@ export const generateLearningPlan = async (userProfile) => {
     return JSON.parse(jsonString);
   } catch (error) {
     console.error("Failed to generate plan:", error);
+    throw error;
+  }
+};
+
+export const generateLearningPathways = async (userProfile) => {
+  if (!model) {
+    throw new Error("Gemini API Key is missing.");
+  }
+
+  const prompt = `
+    You are an expert educational counselor. The user wants to learn about "${userProfile.topic}".
+    Identify 3-4 distinct, actionable learning pathways or specializations within this topic that they could focus on.
+    
+    User Profile:
+    - Level: ${userProfile.level}
+    - Motivation: ${userProfile.motivation}
+    
+    Return ONLY raw JSON (no markdown formatting) with this structure:
+    [
+      {
+        "id": "path-1",
+        "title": "Short Headline (e.g. Data Scientist)",
+        "learning_goal": "A concise sentence describing the primary outcome or goal of this path."
+      }
+    ]
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error("Failed to generate pathways:", error);
     throw error;
   }
 };
