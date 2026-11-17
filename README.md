@@ -1,52 +1,26 @@
-# AI Learning Companion
+# Learning Companion
 
-Your personalized AI tutor that creates, tracks, and adapts custom 7-day learning plans for any topic.
+A phone web app that builds a one-week learning plan, then keeps that week on the device: today’s steps, a check-off list, and a companion you can ask about the work.
 
-![Learning Companion](https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=2667&auto=format&fit=crop)
+## What you need running
 
-## Features
+The phone never talks to Gemini directly. A small Node server does two jobs:
 
-- **Personalized Planning**: Generates comprehensive 7-day learning schedules based on your topic, time commitment, and experience level.
-- **Interactive Chat Companion**: Built-in AI tutor powered by Google Gemini to answer questions and explain concepts in real-time.
-- **Adaptive Revision**: Not happy with the plan? Request changes (e.g., "Make it harder", "Focus on videos") and watch it adapt instantly.
-- **Progress Tracking**: Track your completion of daily modules and steps.
-- **Smart UI**: Dark-mode focused, responsive design with multi-expandable modules for easy review.
+1. **Holds the Gemini key.** Set `GEMINI_API_KEY` in the server environment. Leave it unset and the app runs in practice mode with example plans, so the phone flow still works.
+2. **Saves the week.** Each browser gets an httpOnly cookie. The profile, chosen directions, plan, checkmarks, and chat are stored in SQLite (`data/companion.sqlite` by default). Closing the phone and coming back resumes the same week.
 
-## Tech Stack
+That is the backend this app needs. Accounts and a hosted database matter later, if the same week should follow someone across phones. One phone, one browser profile, is covered by the cookie and SQLite.
 
-- **Frontend**: React + Vite
-- **Styling**: Tailwind CSS
-- **AI**: Google Gemini API (`gemini-2.5-flash`)
-- **Icons**: Lucide React
-- **Markdown**: React Markdown
+## Scripts
 
-## Getting Started
+```bash
+npm install
+npm run dev      # API on :8787 and the phone UI on :5173
+npm test
+npm run build
+npm start        # serves the built app and the API together
+```
 
-1.  **Clone the repository**
-    ```bash
-    git clone <repository-url>
-    cd learning-companion
-    ```
+Copy `.env.example` to `.env` in this folder on the machine that runs the server. The server reads `GEMINI_API_KEY` from the environment, and from that file when the variable is not already set.
 
-2.  **Install dependencies**
-    ```bash
-    npm install
-    ```
-
-3.  **Environment Setup**
-    Create a `.env` file in the root directory and add your Google Gemini API key:
-    ```env
-    VITE_GEMINI_API_KEY=your_api_key_here
-    ```
-
-4.  **Run the application**
-    ```bash
-    npm run dev
-    ```
-
-## Usage
-
-1.  **Onboarding**: Enter your desired topic (e.g., "Python", "Knitting"), time availability, and current level.
-2.  **Review**: Check the generated plan. Expand days to see details.
-3.  **Revise**: If needed, ask for adjustments.
-4.  **Start Learning**: Click "Looks good!" to enter the dashboard and start tracking your progress.
+On a phone, use the installed site (Add to Home Screen). The manifest, theme color, and safe-area padding are set up for that.

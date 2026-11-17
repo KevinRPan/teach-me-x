@@ -1,147 +1,146 @@
-import React, { useState } from 'react';
-import { cn } from '../lib/utils';
+import { useState } from 'react';
 import { ArrowRight, BookOpen, Clock, Target } from 'lucide-react';
+import PhoneShell from './PhoneShell';
+import { cn } from '../lib/utils';
 
-export default function Onboarding({ onComplete }) {
+const TIMES = [
+  ['15min', '15 minutes'],
+  ['30min', '30 minutes'],
+  ['1hr', '1 hour'],
+  ['2hr+', '2 hours or more'],
+];
+
+const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+
+export default function Onboarding({
+  initialProfile,
+  onComplete,
+  sampleMode = false,
+  banner = '',
+  onDismissBanner,
+}) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    topic: '',
-    timeCommitment: '30min',
-    motivation: '',
-    level: 'beginner'
+    topic: initialProfile?.topic || '',
+    timeCommitment: initialProfile?.timeCommitment || '30min',
+    motivation: initialProfile?.motivation || '',
+    level: initialProfile?.level || 'beginner',
   });
 
   const handleNext = () => {
-    // Basic validation
-    if (step === 1 && !formData.topic) return;
-    if (step === 4) {
-      onComplete(formData);
-    } else {
-      setStep(step + 1);
-    }
+    if (step === 1 && formData.topic.trim().length < 2) return;
+    if (step === 4) onComplete({ ...formData, topic: formData.topic.trim(), motivation: formData.motivation.trim() });
+    else setStep(step + 1);
   };
 
   return (
-    <div className="min-h-screen w-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-800 via-neutral-950 to-neutral-950 -z-10" />
-
-      <div className="w-full max-w-lg space-y-8 relative z-10">
-        
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-white to-neutral-500 bg-clip-text text-transparent">Let's build your plan</h1>
-          <p className="text-neutral-400">Step {step} of 4</p>
+    <PhoneShell sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
+      <div className="flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className="mt-6 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">Step {step} of 4</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Let’s build your week</h1>
         </div>
 
-        {/* Form Steps */}
-        <div className="bg-neutral-900/80 backdrop-blur-md p-8 rounded-3xl border border-neutral-800 shadow-2xl">
-          
+        <div className="mt-8 flex-1">
           {step === 1 && (
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-neutral-300">
-                What do you want to learn?
-              </label>
-              <div className="relative">
-                <BookOpen className="absolute left-3 top-3 h-5 w-5 text-neutral-500" />
+            <label className="block space-y-3">
+              <span className="text-sm text-neutral-300">What do you want to learn?</span>
+              <span className="relative block">
+                <BookOpen className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-neutral-500" />
                 <input
                   type="text"
                   value={formData.topic}
-                  onChange={(e) => setFormData({...formData, topic: e.target.value})}
-                  onKeyDown={(e) => e.key === 'Enter' && handleNext()}
-                  placeholder="e.g. Python, Pottery, History of Rome..."
-                  className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-neutral-600"
                   autoFocus
+                  enterKeyHint="next"
+                  maxLength={80}
+                  onChange={(event) => setFormData({ ...formData, topic: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') handleNext();
+                  }}
+                  placeholder="Python, pottery, Rome..."
+                  className="min-h-12 w-full rounded-2xl border border-neutral-700 bg-neutral-900 py-3 pl-11 pr-4 text-base outline-none placeholder:text-neutral-600"
                 />
-              </div>
-            </div>
+              </span>
+            </label>
           )}
 
           {step === 2 && (
-            <div className="space-y-4">
-               <label className="block text-sm font-medium text-neutral-300">
-                How much time do you have daily?
-              </label>
-              <div className="grid grid-cols-1 gap-3">
-                {['15min', '30min', '1hr', '2hr+'].map((time) => (
-                  <button
-                    key={time}
-                    onClick={() => setFormData({...formData, timeCommitment: time})}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNext()}
-                    className={cn(
-                      "flex items-center p-4 rounded-xl border transition-all text-left",
-                      formData.timeCommitment === time 
-                        ? "border-blue-500 bg-blue-500/10 text-blue-200" 
-                        : "border-neutral-700 bg-neutral-800/50 hover:bg-neutral-800 text-neutral-300"
-                    )}
-                  >
-                    <Clock className="h-5 w-5 mr-3 opacity-70" />
-                    <span>{time}</span>
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-3">
+              <p className="text-sm text-neutral-300">How much time do you have each day?</p>
+              {TIMES.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, timeCommitment: value })}
+                  className={cn(
+                    'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left',
+                    formData.timeCommitment === value ? 'border-blue-500 bg-blue-500/10 text-blue-100' : 'border-neutral-800 bg-neutral-900',
+                  )}
+                >
+                  <Clock className="h-5 w-5 opacity-70" />
+                  {label}
+                </button>
+              ))}
             </div>
           )}
 
           {step === 3 && (
-            <div className="space-y-4">
-               <label className="block text-sm font-medium text-neutral-300">
-                What is your current level?
-              </label>
-              <div className="grid grid-cols-1 gap-3">
-                {['Beginner', 'Intermediate', 'Advanced'].map((lvl) => (
-                  <button
-                    key={lvl}
-                    onClick={() => setFormData({...formData, level: lvl.toLowerCase()})}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNext()}
-                    className={cn(
-                      "flex items-center p-4 rounded-xl border transition-all text-left",
-                      formData.level === lvl.toLowerCase()
-                        ? "border-blue-500 bg-blue-500/10 text-blue-200" 
-                        : "border-neutral-700 bg-neutral-800/50 hover:bg-neutral-800 text-neutral-300"
-                    )}
-                  >
-                    <Target className="h-5 w-5 mr-3 opacity-70" />
-                    <span>{lvl}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          
-           {step === 4 && (
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-neutral-300">
-                Why are you learning this? (Optional)
-              </label>
-              <textarea
-                value={formData.motivation}
-                onChange={(e) => setFormData({...formData, motivation: e.target.value})}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleNext();
-                  }
-                }}
-                placeholder="To get a job, just for fun, etc..."
-                className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none placeholder:text-neutral-600"
-                autoFocus
-              />
+            <div className="space-y-3">
+              <p className="text-sm text-neutral-300">Where are you starting?</p>
+              {LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, level: level.toLowerCase() })}
+                  className={cn(
+                    'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left',
+                    formData.level === level.toLowerCase() ? 'border-blue-500 bg-blue-500/10 text-blue-100' : 'border-neutral-800 bg-neutral-900',
+                  )}
+                >
+                  <Target className="h-5 w-5 opacity-70" />
+                  {level}
+                </button>
+              ))}
             </div>
           )}
 
-          <div className="pt-6 mt-6 border-t border-neutral-700 flex justify-end">
+          {step === 4 && (
+            <label className="block space-y-3">
+              <span className="text-sm text-neutral-300">Why this, right now?</span>
+              <textarea
+                value={formData.motivation}
+                autoFocus
+                maxLength={400}
+                onChange={(event) => setFormData({ ...formData, motivation: event.target.value })}
+                placeholder="A trip, a job, curiosity..."
+                className="min-h-36 w-full resize-none rounded-2xl border border-neutral-700 bg-neutral-900 px-4 py-3 text-base outline-none placeholder:text-neutral-600"
+              />
+              <span className="block text-xs text-neutral-500">Optional. It gives the week a point.</span>
+            </label>
+          )}
+        </div>
+
+        <div className="mt-6 flex gap-3">
+          {step > 1 && (
             <button
-              onClick={handleNext}
-              disabled={step === 1 && !formData.topic}
-              className="w-full md:w-auto flex items-center justify-center px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              type="button"
+              onClick={() => setStep(step - 1)}
+              className="min-h-14 rounded-2xl border border-neutral-700 px-5 font-semibold text-neutral-200"
             >
-              {step === 4 ? 'Generate Plan' : 'Next'}
-              <ArrowRight className="ml-2 h-5 w-5" />
+              Back
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={step === 1 && formData.topic.trim().length < 2}
+            className="flex min-h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-white font-semibold text-black disabled:opacity-40"
+          >
+            {step === 4 ? 'See directions' : 'Next'}
+            <ArrowRight className="h-5 w-5" />
+          </button>
         </div>
       </div>
-    </div>
+    </PhoneShell>
   );
 }
