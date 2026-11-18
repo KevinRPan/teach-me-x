@@ -1,89 +1,142 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { MessageCircle, MoreHorizontal, Rows3 } from 'lucide-react';
+import PhoneShell from './PhoneShell';
 import PlanView from './PlanView';
 import ChatInterface from './ChatInterface';
-import { LayoutList, MessageSquare, X } from 'lucide-react';
+import StepRow from './StepRow';
 import { cn } from '../lib/utils';
+import { currentDay, isWeekComplete, planProgress } from '../lib/plan';
 
-export default function Dashboard({ userProfile, plan: initialPlan }) {
-  const [plan, setPlan] = useState(initialPlan);
-  const [isPlanExpanded, setIsPlanExpanded] = useState(false);
-
-  React.useEffect(() => {
-    setPlan(initialPlan);
-  }, [initialPlan]);
-
-  const handleToggleStep = (dayId, stepId) => {
-    setPlan(prevPlan => ({
-      ...prevPlan,
-      days: prevPlan.days.map(day => {
-        if (day.id !== dayId) return day;
-        return {
-          ...day,
-          steps: day.steps.map(step => {
-            if (step.id !== stepId) return step;
-            return { ...step, completed: !step.completed };
-          })
-        };
-      })
-    }));
-  };
+export default function Dashboard({
+  plan,
+  messages,
+  sampleMode,
+  banner,
+  onDismissBanner,
+  onToggleStep,
+  onSend,
+  onReset,
+  sending,
+}) {
+  const [tab, setTab] = useState('plan');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const progress = Math.round(planProgress(plan) * 100);
+  const today = currentDay(plan);
+  const done = isWeekComplete(plan);
 
   return (
-    <div className="h-screen w-screen bg-neutral-950 text-white flex flex-col items-center relative overflow-hidden">
-      {/* Texture Background (Desktop only) */}
-      <div className="hidden md:block absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-800 via-neutral-950 to-neutral-950 -z-10" />
-
-      {/* Main Layout Container */}
-      <div className="w-full h-full md:max-w-6xl md:p-8 flex z-10 relative overflow-hidden">
-        
-        {/* Left Panel / Rail Container */}
-        <div className={cn(
-             "h-full transition-all duration-300 ease-in-out relative z-30",
-             // Mobile/Tablet: Always collapsed rail (expanded via overlay)
-             // Desktop: Always expanded
-             "w-[60px] md:w-[60px] lg:w-[40%]",
-             // Styling
-             "bg-neutral-900 border-r md:border border-neutral-800 md:rounded-3xl md:shadow-2xl overflow-hidden flex-shrink-0"
-        )}>
-             {/* Large Screen: Full View */}
-             <div className="hidden lg:block h-full w-full">
-                  <PlanView plan={plan} onToggleStep={handleToggleStep} />
-             </div>
-
-             {/* Small/Medium Screen: Collapsed Rail View */}
-             <div className="lg:hidden h-full w-full">
-                  <PlanView plan={plan} onToggleStep={handleToggleStep} collapsed={true} onExpand={() => setIsPlanExpanded(true)} />
-             </div>
+    <PhoneShell locked sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-neutral-500">This week</p>
+          <h1 className="truncate text-lg font-semibold">{plan.topic}</h1>
         </div>
-        
-        {/* Mobile/Tablet Overlay for Expanded Plan */}
-        <div className={cn(
-            "lg:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity duration-300",
-            isPlanExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
-        )} onClick={() => setIsPlanExpanded(false)}>
-             <div className={cn(
-                 "absolute left-0 top-0 bottom-0 w-[85%] max-w-sm bg-neutral-900 shadow-2xl transition-transform duration-300",
-                 isPlanExpanded ? "translate-x-0" : "-translate-x-full"
-             )} onClick={e => e.stopPropagation()}>
-                 {/* Close Button Mobile */}
-                 <button onClick={() => setIsPlanExpanded(false)} className="absolute top-4 right-4 p-2 bg-neutral-800 rounded-full z-20">
-                     <X className="h-5 w-5 text-neutral-400" />
-                 </button>
-                 <PlanView plan={plan} onToggleStep={handleToggleStep} />
-             </div>
-        </div>
-
-        {/* Right Panel: Chat Interface */}
-        <div 
-           className={cn(
-            "flex-1 h-full min-w-0 bg-neutral-900 relative z-20",
-            "md:bg-neutral-900/80 md:backdrop-blur-sm md:rounded-3xl md:border md:border-neutral-800 md:shadow-2xl md:ml-6"
-          )}
+        <button
+          type="button"
+          aria-label="Plan options"
+          onClick={() => {
+            setConfirmReset(false);
+            setMenuOpen(true);
+          }}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900"
         >
-          <ChatInterface plan={plan} />
-        </div>
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+      </header>
 
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {tab === 'plan' ? (
+          <div className="h-full overflow-y-auto">
+            <div className="px-4 pb-2 pt-4">
+              <div className="mb-3 flex items-end justify-between">
+                <p className="text-sm text-neutral-400">{done ? 'Week complete' : 'Keep today small'}</p>
+                <p className="text-3xl font-semibold tabular-nums">{progress}%</p>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-neutral-800">
+                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+
+            {today && (
+              <section className="px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">Today</p>
+                <h2 className="mt-1 text-xl font-semibold">{today.title}</h2>
+                <div className="mt-3 space-y-2">
+                  {today.steps.map((step) => (
+                    <StepRow
+                      key={step.id}
+                      step={step}
+                      onToggle={() => onToggleStep(today.id, step.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <div className="px-4 pb-2 pt-4">
+              <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">Full week</h2>
+            </div>
+            <PlanView plan={plan} onToggleStep={onToggleStep} hideHeader startCollapsed />
+          </div>
+        ) : (
+          <ChatInterface messages={messages} onSend={onSend} sending={sending} />
+        )}
       </div>
-    </div>
+
+      <nav className="grid shrink-0 grid-cols-2 border-t border-neutral-800 bg-neutral-950 pb-[max(0.4rem,env(safe-area-inset-bottom))]" aria-label="Sections">
+        <button
+          type="button"
+          onClick={() => setTab('plan')}
+          className={cn('flex min-h-14 flex-col items-center justify-center gap-1 text-xs', tab === 'plan' ? 'text-white' : 'text-neutral-500')}
+        >
+          <Rows3 className="h-5 w-5" />
+          Plan
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('chat')}
+          className={cn('flex min-h-14 flex-col items-center justify-center gap-1 text-xs', tab === 'chat' ? 'text-white' : 'text-neutral-500')}
+        >
+          <MessageCircle className="h-5 w-5" />
+          Companion
+        </button>
+      </nav>
+
+      {menuOpen && (
+        <div className="absolute inset-0 z-20 flex items-end bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={() => setMenuOpen(false)}>
+          <div className="w-full space-y-2 rounded-3xl bg-neutral-900 p-3" onClick={(event) => event.stopPropagation()}>
+            {confirmReset ? (
+              <>
+                <p className="px-3 py-2 text-sm leading-6 text-neutral-300">
+                  This clears the week saved on this phone. You can start a new topic after.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onReset();
+                  }}
+                  className="min-h-12 w-full rounded-2xl bg-red-500/15 font-semibold text-red-100"
+                >
+                  Erase this week
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmReset(true)}
+                className="min-h-12 w-full rounded-2xl text-left px-3 font-medium text-neutral-100"
+              >
+                Start over
+              </button>
+            )}
+            <button type="button" onClick={() => setMenuOpen(false)} className="min-h-12 w-full rounded-2xl bg-neutral-800 font-semibold">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </PhoneShell>
   );
 }

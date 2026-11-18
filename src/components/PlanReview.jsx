@@ -1,54 +1,56 @@
-import React from 'react';
-import PlanView from './PlanView';
-import { cn } from '../lib/utils';
 import { CheckCircle2 } from 'lucide-react';
+import PhoneShell from './PhoneShell';
+import PlanView from './PlanView';
 
-export default function PlanReview({ plan, userProfile, onConfirm, onRevise, hasRevised = false }) {
-  if (!plan) return <div>No plan loaded</div>;
+export default function PlanReview({
+  plan,
+  userProfile,
+  selectedPathways = [],
+  onConfirm,
+  onRevise,
+  onReset,
+  hasRevised = false,
+  sampleMode = false,
+  banner = '',
+  onDismissBanner,
+}) {
+  const focus = selectedPathways.map((pathway) => pathway.title).join(' · ');
 
   return (
-    <div className="min-h-screen w-screen bg-neutral-950 text-white flex flex-col items-center p-4 relative overflow-hidden">
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-800 via-neutral-950 to-neutral-950 -z-10" />
-
-      <div className="w-full max-w-4xl relative z-10 flex flex-col h-full">
-        {/* Header */}
-        <div className="text-center mb-8 mt-8">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-white to-neutral-500 bg-clip-text text-transparent mb-2">
-            Your personalized learning plan
-          </h1>
-          <p className="text-neutral-400">
-            Optimized for your {userProfile?.level || 'learning'} level
-          </p>
-        </div>
-
-        {/* Plan Display */}
-        <div className="flex-1 bg-neutral-900/80 backdrop-blur-md rounded-3xl border border-neutral-800 shadow-2xl overflow-hidden mb-6">
-          <div className="h-full overflow-y-auto">
-            <PlanView plan={plan} readOnly={true} />
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-4 justify-center pb-8">
-          <button
-            onClick={onConfirm}
-            className="px-8 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2 text-lg"
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            Looks good!
-          </button>
-          {!hasRevised && (
-            <button
-              onClick={onRevise}
-              className="px-8 py-4 bg-transparent border-2 border-neutral-700 text-neutral-300 font-semibold rounded-xl hover:bg-neutral-800 hover:border-neutral-600 transition-colors text-lg"
-            >
-              Revise
-            </button>
-          )}
-        </div>
+    <PhoneShell locked sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
+      <div className="border-b border-neutral-800 px-5 py-4">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">Review</p>
+        <h1 className="mt-1 text-2xl font-semibold">Your week is ready</h1>
+        <p className="mt-1 text-sm text-neutral-400">
+          {userProfile?.level || 'Beginner'} · {userProfile?.timeCommitment || '30min'} a day
+          {focus ? ` · ${focus}` : ''}
+        </p>
       </div>
-    </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <PlanView plan={plan} readOnly />
+      </div>
+      <div className="space-y-3 border-t border-neutral-800 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 font-semibold"
+        >
+          <CheckCircle2 className="h-5 w-5" />
+          Start this week
+        </button>
+        {!hasRevised && (
+          <button
+            type="button"
+            onClick={onRevise}
+            className="min-h-12 w-full rounded-2xl border border-neutral-700 font-semibold text-neutral-200"
+          >
+            Change something
+          </button>
+        )}
+        <button type="button" onClick={onReset} className="min-h-11 w-full text-sm text-neutral-500">
+          Start over
+        </button>
+      </div>
+    </PhoneShell>
   );
 }
-
