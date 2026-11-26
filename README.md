@@ -15,7 +15,7 @@ That is the backend this app needs. Accounts and a hosted database matter later,
 
 On the computer that has this folder, `npm run dev` serves it at <http://127.0.0.1:5173>. That address only works on that computer.
 
-On a phone, open <https://learning-companion.kevipan.workers.dev>. That copy runs on Cloudflare. The week is stored in the D1 database `learning-companion`, tied to an httpOnly cookie in the browser. The Gemini key is a Worker secret named `GEMINI_API_KEY`. Until that secret is set, the phone still opens and shows a practice week.
+On a phone, open <https://learning-companion.kevipan.workers.dev>. That copy opens in the browser and saves the week with a cookie in the D1 database `learning-companion`. It shows example plans. A Gemini key on that worker is used only after a person is signed in.
 
 A Cursor publish is a second host. It keeps each signed-in person’s week in its own database and reads the same secret name.
 

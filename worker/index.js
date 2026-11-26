@@ -1,15 +1,19 @@
 import { createApp } from '../server/app.js';
 import { createD1Store } from '../server/d1-store.js';
 import { createRestAi } from '../server/gemini-rest.js';
+import { viewerOwner } from '../server/viewer.js';
 import { serveShell } from './shell.js';
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+      const owner = await viewerOwner(request);
       const app = createApp({
         store: createD1Store(env.DB),
-        ai: createRestAi(env.GEMINI_API_KEY),
+        ai: createRestAi(owner ? env.GEMINI_API_KEY : ''),
+        identify: viewerOwner,
+        practiceGuests: !owner,
       });
       return app(request);
     }

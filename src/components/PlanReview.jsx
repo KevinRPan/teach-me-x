@@ -29,7 +29,7 @@ export default function PlanReview({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <PlanView plan={plan} readOnly />
       </div>
-      <div className="space-y-3 border-t border-neutral-800 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 space-y-3 border-t border-neutral-800 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           onClick={onConfirm}

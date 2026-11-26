@@ -129,7 +129,7 @@ function viewState(state, sampleMode) {
 
 const GREETING = "Hi! I'm your learning companion. Ask about today's step, or tell me where you're stuck.";
 
-export function createApp({ store, ai, now = () => Date.now(), identify }) {
+export function createApp({ store, ai, now = () => Date.now(), identify, practiceGuests = false }) {
   return async function app(request) {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
@@ -143,8 +143,20 @@ export function createApp({ store, ai, now = () => Date.now(), identify }) {
 
       if (identify) {
         sessionId = await identify(request);
-        if (!sessionId) return json(401, { error: 'Sign in to open your week.' });
-        await store.ensure(sessionId);
+        if (sessionId) {
+          await store.ensure(sessionId);
+        } else if (!practiceGuests || !ai.sampleMode) {
+          return json(401, { error: 'Sign in to open your week.' });
+        } else {
+          const existing = readCookie(request);
+          if (await store.hasSession(existing)) {
+            sessionId = existing;
+          } else {
+            sessionId = await store.createSession();
+            const secure = url.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https';
+            cookie = sessionCookie(sessionId, secure);
+          }
+        }
       } else {
         const existing = readCookie(request);
         if (await store.hasSession(existing)) {

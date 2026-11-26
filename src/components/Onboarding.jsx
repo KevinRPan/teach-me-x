@@ -29,19 +29,21 @@ export default function Onboarding({
 
   const handleNext = () => {
     if (step === 1 && formData.topic.trim().length < 2) return;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (step === 4) onComplete({ ...formData, topic: formData.topic.trim(), motivation: formData.motivation.trim() });
     else setStep(step + 1);
   };
 
   return (
     <PhoneShell sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
-      <div className="flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
         <div className="mt-6 space-y-2">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">Step {step} of 4</p>
           <h1 className="text-3xl font-semibold tracking-tight">Let’s build your week</h1>
         </div>
 
-        <div className="mt-8 flex-1">
+        <div className="mt-8">
           {step === 1 && (
             <label className="block space-y-3">
               <span className="text-sm text-neutral-300">What do you want to learn?</span>
@@ -119,8 +121,9 @@ export default function Onboarding({
             </label>
           )}
         </div>
+        </div>
 
-        <div className="mt-6 flex gap-3">
+        <div className="flex shrink-0 gap-3 border-t border-neutral-800 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {step > 1 && (
             <button
               type="button"

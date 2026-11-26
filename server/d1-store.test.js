@@ -56,7 +56,7 @@ test('a D1 week stays on its cookie and a second browser starts empty', async ()
   assert.equal(fresh.profile, null);
 });
 
-test('the worker answers /api from D1 and lets the asset binding serve the phone shell', async () => {
+test('the worker serves the phone shell and a practice week without Cursor sign-in', async () => {
   const env = {
     DB: memoryD1(),
     ASSETS: {
@@ -70,5 +70,17 @@ test('the worker answers /api from D1 and lets the asset binding serve the phone
 
   const state = await worker.fetch(new Request('https://learning-companion.example/api/state'), env);
   assert.equal(state.status, 200);
-  assert.match(state.headers.get('content-type'), /json/);
+  const body = await state.json();
+  assert.equal(body.sampleMode, true);
+  assert.match(state.headers.get('set-cookie'), /lc_session=/);
+
+  const spent = await worker.fetch(new Request('https://learning-companion.example/api/pathways', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: state.headers.get('set-cookie').split(';')[0] },
+    body: JSON.stringify({
+      profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: '' },
+    }),
+  }), env);
+  assert.equal(spent.status, 200);
+  assert.equal((await spent.json()).sampleMode, true);
 });

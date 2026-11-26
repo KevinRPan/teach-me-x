@@ -1,9 +1,20 @@
 async function api(path, body) {
-  const response = await fetch(path, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch(path, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('That took too long. Try again.');
+    throw new Error('Can’t reach the server. Try again.');
+  } finally {
+    clearTimeout(timer);
+  }
 
   let data = null;
   try {
