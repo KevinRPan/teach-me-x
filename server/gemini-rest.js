@@ -161,7 +161,23 @@ async function generate(apiKey, contents) {
       body: JSON.stringify({ contents }),
     },
   ));
-  if (!response.ok) throw httpError(502, 'The model could not answer. Try again.');
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const err = await response.json();
+      detail = String(err?.error?.status || err?.error?.message || '');
+    } catch {
+      detail = '';
+    }
+    detail = detail.replace(/AIza[\w-]+/g, '').replace(/\s+/g, ' ').trim();
+    if (response.status === 402 || response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail)) {
+      throw httpError(502, 'Gemini is out of quota for this key. Check the key in Google AI Studio, then try again.');
+    }
+    if (response.status === 400 || response.status === 401 || response.status === 403 || /API_KEY_INVALID|PERMISSION_DENIED/i.test(detail)) {
+      throw httpError(502, 'Gemini rejected the key on this server. Replace the Worker secret, then try again.');
+    }
+    throw httpError(502, 'The model could not answer. Try again.');
+  }
   const data = await response.json();
   return data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
 }

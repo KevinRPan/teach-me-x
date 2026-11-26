@@ -84,3 +84,81 @@ test('the worker serves the phone shell and a practice week without Cursor sign-
   assert.equal(spent.status, 200);
   assert.equal((await spent.json()).sampleMode, true);
 });
+
+test('the worker leaves practice mode when the Gemini key is set', async () => {
+  const env = {
+    DB: memoryD1(),
+    GEMINI_API_KEY: 'present',
+    ASSETS: { async fetch() { return new Response('phone shell'); } },
+  };
+  const state = await worker.fetch(new Request('https://learning-companion.example/api/state'), env);
+  assert.equal(state.status, 200);
+  assert.equal((await state.json()).sampleMode, false);
+});
+
+test('a phone guest can use a live model without Cursor sign-in', async () => {
+  const app = createApp({
+    store: createD1Store(memoryD1()),
+    ai: {
+      sampleMode: false,
+      async pathways() { throw new Error('not called'); },
+      async plan() { throw new Error('not called'); },
+      async revise() { throw new Error('not called'); },
+      async chat() { throw new Error('not called'); },
+    },
+    identify: async () => null,
+    practiceGuests: true,
+  });
+  const state = await app(new Request('http://phone.test/api/state'));
+  assert.equal(state.status, 200);
+  assert.equal((await state.json()).sampleMode, false);
+});
+
+test('a signed-out caller is refused when the host does not allow guests', async () => {
+  const app = createApp({
+    store: createD1Store(memoryD1()),
+    ai: {
+      sampleMode: false,
+      async pathways() { throw new Error('not called'); },
+      async plan() { throw new Error('not called'); },
+      async revise() { throw new Error('not called'); },
+      async chat() { throw new Error('not called'); },
+    },
+    identify: async () => null,
+  });
+  const state = await app(new Request('http://phone.test/api/state'));
+  assert.equal(state.status, 401);
+});
+
+test('callers who drop the cookie still share an hourly limit for one address', async () => {
+  let calls = 0;
+  const app = createApp({
+    store: createD1Store(memoryD1()),
+    ai: {
+      sampleMode: false,
+      async pathways() {
+        calls += 1;
+        return [{ id: 'path-1', title: 'Basics', learning_goal: 'Start.' }];
+      },
+      async plan() { throw new Error('not called'); },
+      async revise() { throw new Error('not called'); },
+      async chat() { throw new Error('not called'); },
+    },
+    identify: async () => null,
+    practiceGuests: true,
+  });
+  const body = JSON.stringify({
+    profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: '' },
+  });
+  let limited = 0;
+  for (let i = 0; i < 45; i += 1) {
+    const response = await app(new Request('http://phone.test/api/pathways', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.10' },
+      body,
+    }));
+    if (response.status === 429) limited += 1;
+  }
+  assert.equal(calls, 40);
+  assert.equal(limited, 5);
+});
