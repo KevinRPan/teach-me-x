@@ -11,6 +11,12 @@ The phone never talks to Gemini directly. A small Node server does two jobs:
 
 That is the backend this app needs. Accounts and a hosted database matter later, if the same week should follow someone across phones. One phone, one browser profile, is covered by the cookie and SQLite.
 
+## Open it
+
+On the computer that has this folder, `npm run dev` serves it at <http://127.0.0.1:5173>. That address only works on that computer.
+
+To open it on a phone, publish it from Cursor. The hosted copy keeps each signed-in person’s week in its own database, and it reads `GEMINI_API_KEY` from the app’s secrets. Until that secret is set, the phone still opens and shows a practice week.
+
 ## Scripts
 
 ```bash

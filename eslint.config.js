@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'cursor/identity.js']),
   {
     files: ['src/**/*.{js,jsx}', 'eslint.config.js'],
     extends: [
@@ -27,7 +27,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['server/**/*.js', 'vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
+    files: ['server/**/*.js', 'api/**/*.js', 'vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 2022,

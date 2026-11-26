@@ -33,6 +33,14 @@ export function emptyState() {
   };
 }
 
+export function ownerIdOk(id) {
+  if (typeof id !== 'string' || id.length < 1 || id.length > 200) return false;
+  for (let index = 0; index < id.length; index += 1) {
+    if (id.charCodeAt(index) <= 32) return false;
+  }
+  return true;
+}
+
 function parseJson(value, fallback) {
   if (!value) return fallback;
   try {
@@ -79,6 +87,18 @@ export function createStore(dbPath) {
     },
     hasSession(id) {
       return typeof id === 'string' && /^[a-f0-9]{48}$/.test(id) && Boolean(findSession.get(id));
+    },
+    ensure(id) {
+      if (!ownerIdOk(id)) {
+        const error = new Error('That account cannot be saved.');
+        error.status = 400;
+        throw error;
+      }
+      if (!findSession.get(id)) {
+        const now = new Date().toISOString();
+        insertSession.run(id, now);
+        insertState.run(id, now);
+      }
     },
     read(id) {
       const row = readRow.get(id);

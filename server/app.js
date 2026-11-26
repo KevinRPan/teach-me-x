@@ -129,7 +129,7 @@ function viewState(state, sampleMode) {
 
 const GREETING = "Hi! I'm your learning companion. Ask about today's step, or tell me where you're stuck.";
 
-export function createApp({ store, ai, now = () => Date.now() }) {
+export function createApp({ store, ai, now = () => Date.now(), identify }) {
   return async function app(request) {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
@@ -141,17 +141,23 @@ export function createApp({ store, ai, now = () => Date.now() }) {
         return json(404, { error: 'Not found.' });
       }
 
-      const existing = readCookie(request);
-      if (store.hasSession(existing)) {
-        sessionId = existing;
+      if (identify) {
+        sessionId = await identify(request);
+        if (!sessionId) return json(401, { error: 'Sign in to open your week.' });
+        await store.ensure(sessionId);
       } else {
-        sessionId = store.createSession();
-        const secure = url.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https';
-        cookie = sessionCookie(sessionId, secure);
+        const existing = readCookie(request);
+        if (await store.hasSession(existing)) {
+          sessionId = existing;
+        } else {
+          sessionId = await store.createSession();
+          const secure = url.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https';
+          cookie = sessionCookie(sessionId, secure);
+        }
       }
 
       const method = request.method.toUpperCase();
-      const state = store.read(sessionId);
+      const state = await store.read(sessionId);
       const cookies = cookie ? [cookie] : [];
 
       if (method === 'GET' && pathname === '/api/state') {
@@ -161,7 +167,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
       if (method !== 'POST') throw httpError(405, 'Method not allowed.');
 
       if (pathname === '/api/reset') {
-        store.write(sessionId, emptyState());
+        await store.write(sessionId, emptyState());
         return json(200, viewState(emptyState(), ai.sampleMode), cookies);
       }
 
@@ -179,7 +185,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
           profile,
           pathways,
         };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
@@ -205,7 +211,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
           hasRevised: false,
           messages: [],
         };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
@@ -219,7 +225,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
         charge(sessionId, now());
         const plan = await ai.revise(state.plan, state.profile, feedback);
         const next = { ...state, plan, hasRevised: true };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
@@ -232,7 +238,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
           planStatus: 'active',
           messages: state.messages.length > 0 ? state.messages : [{ role: 'assistant', content: GREETING }],
         };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
@@ -242,7 +248,7 @@ export function createApp({ store, ai, now = () => Date.now() }) {
         }
         const plan = toggleStep(state.plan, body.dayId, body.stepId);
         const next = { ...state, plan };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
@@ -261,14 +267,14 @@ export function createApp({ store, ai, now = () => Date.now() }) {
           { role: 'assistant', content: reply },
         ].slice(-80);
         const next = { ...state, messages };
-        store.write(sessionId, next);
+        await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
       throw httpError(404, 'Not found.');
     } catch (error) {
       const status = error.status || 500;
-      if (status === 500) console.error(error);
+      if (status === 500) console.error(error instanceof Error ? error.message : 'request failed');
       const message = status === 500 ? 'Something went wrong. Try again.' : error.message;
       return json(status, { error: message }, cookie ? [cookie] : []);
     }

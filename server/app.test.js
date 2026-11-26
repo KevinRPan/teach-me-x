@@ -191,6 +191,45 @@ test('the server env file fills missing keys and leaves existing ones alone', ()
   }
 });
 
+test('signed-in people keep separate weeks and guests are turned away', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'companion-owner-'));
+  const store = createStore(path.join(dir, 'test.sqlite'));
+  const app = createApp({
+    store,
+    ai: practiceAi(),
+    identify: async (request) => request.headers.get('x-test-owner'),
+  });
+  try {
+    const saved = await app(new Request('http://127.0.0.1/api/pathways', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-owner': 'local:person-a',
+      },
+      body: JSON.stringify({
+        profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: '' },
+      }),
+    }));
+    assert.equal(saved.status, 200);
+
+    const other = await app(new Request('http://127.0.0.1/api/state', {
+      headers: { 'x-test-owner': 'local:person-b' },
+    }));
+    assert.equal((await other.json()).profile, null);
+
+    const again = await app(new Request('http://127.0.0.1/api/state', {
+      headers: { 'x-test-owner': 'local:person-a' },
+    }));
+    assert.equal((await again.json()).profile.topic, 'Pottery');
+
+    const guest = await app(new Request('http://127.0.0.1/api/state'));
+    assert.equal(guest.status, 401);
+  } finally {
+    store.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('oversized bodies and path traversal are refused', async () => {
   await withApp(async (app) => {
     const response = await app(new Request('http://127.0.0.1/api/pathways', {
