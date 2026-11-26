@@ -27,7 +27,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['server/**/*.js', 'api/**/*.js', 'vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
+    files: ['server/**/*.js', 'api/**/*.js', 'worker/**/*.js', 'vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 2022,

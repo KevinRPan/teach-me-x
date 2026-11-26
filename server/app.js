@@ -1,5 +1,5 @@
 import { httpError } from './http.js';
-import { emptyState } from './store.js';
+import { emptyState } from './state.js';
 
 const COOKIE = 'lc_session';
 const LEVELS = new Set(['beginner', 'intermediate', 'advanced']);
