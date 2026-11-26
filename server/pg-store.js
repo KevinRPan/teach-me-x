@@ -1,33 +1,5 @@
 import { sql } from './db.js';
-import { emptyState, ownerIdOk } from './store.js';
-
-function parseJson(value, fallback) {
-  if (!value) return fallback;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function rowToState(row) {
-  if (!row) return emptyState();
-  const profile = parseJson(row.profile_json, null);
-  const pathways = parseJson(row.pathways_json, []);
-  const selectedPathways = parseJson(row.selected_json, []);
-  const plan = parseJson(row.plan_json, null);
-  const messages = parseJson(row.messages_json, []);
-  return {
-    profile: profile && typeof profile === 'object' ? profile : null,
-    pathways: Array.isArray(pathways) ? pathways : [],
-    selectedPathways: Array.isArray(selectedPathways) ? selectedPathways : [],
-    plan: plan && typeof plan === 'object' ? plan : null,
-    planStatus: row.plan_status || null,
-    hasRevised: Boolean(row.has_revised),
-    messages: Array.isArray(messages) ? messages : [],
-  };
-}
+import { ownerIdOk, stateFromRow } from './state.js';
 
 export function createPgStore(query = sql) {
   return {
@@ -44,7 +16,7 @@ export function createPgStore(query = sql) {
     },
     async read(id) {
       const rows = await query('select * from learner_state where owner = $1', [id]);
-      return rowToState(rows[0]);
+      return stateFromRow(rows[0]);
     },
     async write(id, state) {
       await query(
