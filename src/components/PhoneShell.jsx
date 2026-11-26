@@ -1,4 +1,5 @@
 import { cn } from '../lib/utils';
+import { useVisualViewport } from '../lib/viewport';
 
 export default function PhoneShell({
   children,
@@ -7,15 +8,13 @@ export default function PhoneShell({
   onDismissBanner,
   locked = false,
 }) {
+  useVisualViewport();
+
   return (
-    <div className="min-h-dvh bg-neutral-950 text-white md:bg-neutral-900 md:py-6">
+    <div className="bg-neutral-950 text-white">
       <div
-        className={cn(
-          'relative mx-auto flex w-full max-w-[480px] flex-col bg-neutral-950 md:rounded-[2rem] md:border md:border-neutral-800 md:shadow-2xl',
-          locked
-            ? 'h-dvh overflow-hidden md:h-[min(920px,calc(100dvh-3rem))]'
-            : 'min-h-dvh md:min-h-[min(920px,calc(100dvh-3rem))]',
-        )}
+        className="fixed inset-x-0 z-10 mx-auto flex w-full max-w-[480px] flex-col overflow-hidden bg-neutral-950 md:rounded-[2rem] md:border md:border-neutral-800"
+        style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,rgba(64,64,64,0.55),transparent_70%)]" />
         <div className={cn('relative flex min-h-0 flex-1 flex-col', locked && 'overflow-hidden')}>

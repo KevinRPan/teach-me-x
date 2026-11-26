@@ -12,9 +12,11 @@ export default function PathwaysSelection({
   banner = '',
   onDismissBanner,
 }) {
-  const [selected, setSelected] = useState(() => new Set());
+  const [selected, setSelected] = useState(() => new Set(pathways[0] ? [pathways[0].id] : []));
+  const [hint, setHint] = useState('');
 
   const toggle = (id) => {
+    setHint('');
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -25,7 +27,8 @@ export default function PathwaysSelection({
 
   return (
     <PhoneShell sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
-      <div className="flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
         <button type="button" onClick={onBack} className="mt-3 inline-flex min-h-11 items-center gap-2 self-start text-sm text-neutral-300">
           <ArrowLeft className="h-4 w-4" />
           Edit answers
@@ -68,16 +71,25 @@ export default function PathwaysSelection({
             );
           })}
         </div>
+        </div>
 
-        <button
-          type="button"
-          disabled={selected.size === 0}
-          onClick={() => onConfirm([...selected])}
-          className="mt-6 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-base font-semibold text-black disabled:opacity-40"
-        >
-          Build this week
-          <ArrowRight className="h-5 w-5" />
-        </button>
+        <div className="shrink-0 border-t border-neutral-800 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {hint && <p className="mb-2 text-center text-sm text-amber-100">{hint}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              if (selected.size === 0) {
+                setHint('Pick at least one direction.');
+                return;
+              }
+              onConfirm([...selected]);
+            }}
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-base font-semibold text-black"
+          >
+            {selected.size === 0 ? 'Pick a direction' : 'Build this week'}
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </PhoneShell>
   );
