@@ -56,7 +56,7 @@ test('a D1 week stays on its cookie and a second browser starts empty', async ()
   assert.equal(fresh.profile, null);
 });
 
-test('the worker answers /api from D1 and lets the asset binding serve the phone shell', async () => {
+test('the worker serves the phone shell and refuses an unsigned API call', async () => {
   const env = {
     DB: memoryD1(),
     ASSETS: {
@@ -69,6 +69,18 @@ test('the worker answers /api from D1 and lets the asset binding serve the phone
   assert.equal(await page.text(), 'phone shell');
 
   const state = await worker.fetch(new Request('https://learning-companion.example/api/state'), env);
-  assert.equal(state.status, 200);
-  assert.match(state.headers.get('content-type'), /json/);
+  assert.equal(state.status, 401);
+  const denied = await state.json();
+  assert.equal(denied.error, 'Sign in to open your week.');
+
+  const spent = await worker.fetch(new Request('https://learning-companion.example/api/pathways', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: '' },
+    }),
+  }), env);
+  assert.equal(spent.status, 401);
+  const sessions = await env.DB.prepare('select count(*) as n from sessions').bind().first();
+  assert.equal(sessions.n, 0);
 });
