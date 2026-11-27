@@ -11,10 +11,16 @@ import {
   createPathways,
   createPlan,
   getState,
+  leaveCourse,
+  loadFeed,
+  newCourse,
+  openCourse,
   resetPlan,
   revisePlan,
   saveLesson,
   sendChat,
+  skipFeed,
+  takeFeed,
 } from './lib/api';
 
 function viewFor(state) {
@@ -33,6 +39,10 @@ export default function App() {
   const [pathways, setPathways] = useState([]);
   const [selectedPathways, setSelectedPathways] = useState([]);
   const [plan, setPlan] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [feed, setFeed] = useState([]);
+  const [activeCourseId, setActiveCourseId] = useState(null);
+  const [pausedCourseId, setPausedCourseId] = useState(null);
   const [hasRevised, setHasRevised] = useState(false);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -44,6 +54,10 @@ export default function App() {
     setPathways(state.pathways || []);
     setSelectedPathways(state.selectedPathways || []);
     setPlan(state.plan || null);
+    setCourses(state.courses || []);
+    setFeed(state.feed || []);
+    setActiveCourseId(state.activeCourseId || null);
+    setPausedCourseId(state.pausedCourseId || null);
     setHasRevised(Boolean(state.hasRevised));
     setMessages(state.messages || []);
     setView(nextView);
@@ -139,6 +153,52 @@ export default function App() {
     return state;
   };
 
+  const handleReturnToCourse = async () => {
+    if (!pausedCourseId) return;
+    setError('');
+    try {
+      applyState(await openCourse(pausedCourseId));
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const handleLeaveCourse = async () => {
+    setError('');
+    try {
+      applyState(await leaveCourse());
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const handleAddCourse = async () => {
+    const state = await newCourse();
+    applyState(state);
+  };
+
+  const handleOpenCourse = async (courseId) => {
+    const state = await openCourse(courseId);
+    applyState(state);
+  };
+
+  const handleLoadFeed = async (refresh = false) => {
+    const state = await loadFeed(refresh);
+    applyState(state, 'dashboard');
+    return state;
+  };
+
+  const handleTakeFeed = async (feedId) => {
+    const state = await takeFeed(feedId);
+    applyState(state, 'dashboard');
+    return state.focus;
+  };
+
+  const handleSkipFeed = async (feedId) => {
+    const state = await skipFeed(feedId);
+    applyState(state, 'dashboard');
+  };
+
   const handleSend = async (message) => {
     setSending(true);
     setError('');
@@ -209,6 +269,7 @@ export default function App() {
           setView('revising');
         }}
         onReset={handleReset}
+        onReturn={pausedCourseId ? handleReturnToCourse : undefined}
         hasRevised={hasRevised}
         sampleMode={sampleMode}
         banner={error}
@@ -233,14 +294,24 @@ export default function App() {
   if (view === 'dashboard' && plan) {
     return (
       <Dashboard
+        key={activeCourseId || 'course'}
         plan={plan}
         messages={messages}
+        courses={courses}
+        feed={feed}
+        activeCourseId={activeCourseId}
         sampleMode={sampleMode}
         banner={error}
         onDismissBanner={() => setError('')}
         onSaveStep={handleSaveStep}
         onSend={handleSend}
         onReset={handleReset}
+        onLeaveCourse={handleLeaveCourse}
+        onAddCourse={handleAddCourse}
+        onOpenCourse={handleOpenCourse}
+        onLoadFeed={handleLoadFeed}
+        onTakeFeed={handleTakeFeed}
+        onSkipFeed={handleSkipFeed}
         sending={sending}
       />
     );
@@ -250,6 +321,7 @@ export default function App() {
     <Onboarding
       initialProfile={userProfile}
       onComplete={handleOnboardingComplete}
+      onCancel={pausedCourseId ? handleReturnToCourse : undefined}
       sampleMode={sampleMode}
       banner={error}
       onDismissBanner={() => setError('')}

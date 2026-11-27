@@ -9,6 +9,7 @@ import {
   mockLesson,
   planContext,
 } from './lesson.js';
+import { feedPrompt } from './library.js';
 
 const MODEL = 'gemini-2.5-flash';
 
@@ -288,6 +289,15 @@ export function createAi() {
         if (lessonErrorBlocks(error)) throw error;
         console.error(error instanceof Error ? error.message : 'lesson failed');
         return backupLesson(profile, plan, day, step);
+      }
+    },
+    async feed(seeds) {
+      try {
+        return await complete(model, feedPrompt(seeds));
+      } catch (error) {
+        if (lessonErrorBlocks(error)) throw error;
+        console.error(error instanceof Error ? error.message : 'feed failed');
+        return null;
       }
     },
   };

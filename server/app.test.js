@@ -353,3 +353,64 @@ test('a written lesson is kept, refreshed, and not replaced when the model is ou
     assert.deepEqual(kept.notes, { p1: 'They slipped.' });
   }, ai);
 });
+
+test('courses stay on the phone, and the feed can add one activity', async () => {
+  await withApp(async (app) => {
+    const started = await post(app, '/api/pathways', {
+      profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: 'mugs' },
+    });
+    const cookie = cookieFrom(started);
+    await post(app, '/api/plan', { pathwayIds: ['path-2'] }, cookie);
+    const confirmed = await (await post(app, '/api/plan/confirm', {}, cookie)).json();
+    assert.equal(confirmed.courses.length, 1);
+    assert.equal(confirmed.activeCourseId, 'course-1');
+    assert.equal(confirmed.courses[0].topic, 'Pottery');
+
+    const blocked = await post(app, '/api/pathways', {
+      profile: { topic: 'Knitting', level: 'beginner', timeCommitment: '30min', motivation: '' },
+    }, cookie);
+    assert.equal(blocked.status, 409);
+
+    const shelved = await (await post(app, '/api/courses/new', {}, cookie)).json();
+    assert.equal(shelved.plan, null);
+    assert.equal(shelved.courses.length, 1);
+    assert.equal(shelved.pausedCourseId, 'course-1');
+
+    const returned = await (await post(app, '/api/courses/open', { courseId: shelved.pausedCourseId }, cookie)).json();
+    assert.equal(returned.plan.topic, 'Pottery');
+    assert.equal(returned.pausedCourseId, null);
+    const shelvedAgain = await (await post(app, '/api/courses/new', {}, cookie)).json();
+    assert.equal(shelvedAgain.pausedCourseId, 'course-1');
+
+    await post(app, '/api/pathways', {
+      profile: { topic: 'Knitting', level: 'beginner', timeCommitment: '30min', motivation: 'scarves' },
+    }, cookie);
+    await post(app, '/api/plan', { pathwayIds: ['path-1'] }, cookie);
+    const second = await (await post(app, '/api/plan/confirm', {}, cookie)).json();
+    assert.equal(second.plan.topic, 'Knitting');
+    assert.equal(second.courses.length, 2);
+    assert.equal(second.activeCourseId, 'course-2');
+    assert.equal(second.pausedCourseId, null);
+
+    const back = await (await post(app, '/api/courses/open', { courseId: 'course-1' }, cookie)).json();
+    assert.equal(back.plan.topic, 'Pottery');
+    assert.equal(back.activeCourseId, 'course-1');
+
+    const feed = await (await post(app, '/api/feed', {}, cookie)).json();
+    assert.ok(feed.feed.length >= 2);
+    assert.ok(feed.feed.some((item) => item.topic === 'Pottery'));
+    assert.ok(feed.feed.some((item) => item.topic === 'Knitting'));
+    const before = feed.plan.days[0].steps.length;
+    const taken = await (await post(app, '/api/feed/take', { feedId: feed.feed[0].id }, cookie)).json();
+    assert.equal(taken.focus.dayId, 'day-1');
+    assert.equal(taken.plan.days[0].steps.length, before + 1);
+    assert.equal(taken.feed.length, feed.feed.length - 1);
+
+    const skipped = await (await post(app, '/api/feed/skip', { feedId: taken.feed[0].id }, cookie)).json();
+    assert.equal(skipped.feed.length, taken.feed.length - 1);
+
+    const left = await (await post(app, '/api/courses/leave', {}, cookie)).json();
+    assert.equal(left.plan.topic, 'Knitting');
+    assert.equal(left.courses.length, 1);
+  });
+});

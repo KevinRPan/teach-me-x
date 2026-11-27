@@ -1,4 +1,4 @@
-import { ownerIdOk, stateFromRow } from './state.js';
+import { ownerIdOk, pathwaysColumn, stateFromRow } from './state.js';
 
 const SESSION = /^[a-f0-9]{48}$/;
 
@@ -64,7 +64,7 @@ export function createD1Store(db) {
     async write(id, state) {
       await writeRow.bind(
         state.profile ? JSON.stringify(state.profile) : null,
-        JSON.stringify(state.pathways || []),
+        pathwaysColumn(state),
         JSON.stringify(state.selectedPathways || []),
         state.plan ? JSON.stringify(state.plan) : null,
         state.planStatus || null,

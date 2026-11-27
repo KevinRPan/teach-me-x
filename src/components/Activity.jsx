@@ -108,7 +108,7 @@ export default function Activity({
             className="inline-flex min-h-11 items-center gap-1 text-sm text-neutral-300 disabled:opacity-50"
           >
             <ArrowLeft className="h-4 w-4" />
-            Plan
+            Back
           </button>
           <p className="text-sm tabular-nums text-neutral-400">
             {index + 1} of {day.steps.length}

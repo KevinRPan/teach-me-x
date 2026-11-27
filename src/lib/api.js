@@ -49,3 +49,15 @@ export const saveLesson = (dayId, stepId, extra = {}) => api('/api/lesson', { da
 export const sendChat = (message) => api('/api/chat', { message });
 
 export const resetPlan = () => api('/api/reset', {});
+
+export const newCourse = () => api('/api/courses/new', {});
+
+export const openCourse = (courseId) => api('/api/courses/open', { courseId });
+
+export const leaveCourse = () => api('/api/courses/leave', {});
+
+export const loadFeed = (refresh = false) => api('/api/feed', refresh ? { refresh: true } : {});
+
+export const takeFeed = (feedId) => api('/api/feed/take', { feedId });
+
+export const skipFeed = (feedId) => api('/api/feed/skip', { feedId });
