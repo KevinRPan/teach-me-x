@@ -8,12 +8,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
-      const owner = await viewerOwner(request);
       const app = createApp({
         store: createD1Store(env.DB),
-        ai: createRestAi(owner ? env.GEMINI_API_KEY : ''),
+        ai: createRestAi(env.GEMINI_API_KEY),
         identify: viewerOwner,
-        practiceGuests: !owner,
+        practiceGuests: true,
       });
       return app(request);
     }

@@ -78,17 +78,24 @@ function cleanProfile(input) {
   };
 }
 
-function charge(sessionId, now) {
-  const bucket = buckets.get(sessionId);
-  if (!bucket || now - bucket.start > HOUR) {
-    buckets.set(sessionId, { start: now, count: 1 });
-    return;
+function clientAddress(request) {
+  return clip(request.headers.get('cf-connecting-ip') || '', 64);
+}
+
+function charge(sessionId, now, address = '') {
+  const keys = address ? [sessionId, `ip:${address}`] : [sessionId];
+  for (const key of keys) {
+    const bucket = buckets.get(key);
+    if (!bucket || now - bucket.start > HOUR) {
+      buckets.set(key, { start: now, count: 1 });
+      continue;
+    }
+    bucket.count += 1;
+    if (bucket.count > AI_LIMIT) {
+      throw httpError(429, 'Too many requests this hour. Take a break and try again.');
+    }
   }
-  bucket.count += 1;
-  if (bucket.count > AI_LIMIT) {
-    throw httpError(429, 'Too many requests this hour. Take a break and try again.');
-  }
-  if (buckets.size > 5000) {
+  while (buckets.size > 5000) {
     const oldest = buckets.keys().next().value;
     buckets.delete(oldest);
   }
@@ -145,7 +152,7 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
         sessionId = await identify(request);
         if (sessionId) {
           await store.ensure(sessionId);
-        } else if (!practiceGuests || !ai.sampleMode) {
+        } else if (!practiceGuests) {
           return json(401, { error: 'Sign in to open your week.' });
         } else {
           const existing = readCookie(request);
@@ -190,7 +197,7 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
           throw httpError(409, 'Reset your plan before starting another.');
         }
         const profile = cleanProfile(body.profile);
-        charge(sessionId, now());
+        charge(sessionId, now(), clientAddress(request));
         const pathways = await ai.pathways(profile);
         const next = {
           ...emptyState(),
@@ -213,7 +220,7 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
         if (selected.length === 0 || selected.length > 4) {
           throw httpError(400, 'Pick at least one direction.');
         }
-        charge(sessionId, now());
+        charge(sessionId, now(), clientAddress(request));
         const plan = await ai.plan(state.profile, selected);
         const next = {
           ...state,
@@ -234,7 +241,7 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
         if (state.hasRevised) throw httpError(409, 'This plan was already revised once.');
         const feedback = clip(body.feedback, 600);
         if (feedback.length < 4) throw httpError(400, 'Say a little more about what to change.');
-        charge(sessionId, now());
+        charge(sessionId, now(), clientAddress(request));
         const plan = await ai.revise(state.plan, state.profile, feedback);
         const next = { ...state, plan, hasRevised: true };
         await store.write(sessionId, next);
@@ -270,7 +277,7 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
         }
         const message = clip(body.message, 2000);
         if (!message) throw httpError(400, 'Write a message first.');
-        charge(sessionId, now());
+        charge(sessionId, now(), clientAddress(request));
         const reply = String(await ai.chat(state.messages, message, state.plan)).trim().slice(0, 8000);
         if (!reply) throw httpError(502, 'The model returned an empty reply. Try again.');
         const messages = [
