@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createAi } from './ai.js';
 import { loadEnvFile } from './env.js';
 import { createApp } from './app.js';
+import { httpError } from './http.js';
 import { extractJson, normalizePlan, safeHttpsUrl } from './json.js';
 import { safeStaticPath } from './index.js';
 import { createStore } from './store.js';
@@ -43,10 +44,10 @@ function practiceAi() {
   };
 }
 
-async function withApp(run) {
+async function withApp(run, ai = practiceAi()) {
   const dir = await mkdtemp(path.join(tmpdir(), 'companion-'));
   const store = createStore(path.join(dir, 'test.sqlite'));
-  const app = createApp({ store, ai: practiceAi() });
+  const app = createApp({ store, ai });
   try {
     await run(app);
   } finally {
@@ -244,4 +245,172 @@ test('oversized bodies and path traversal are refused', async () => {
   assert.equal(safeStaticPath(root, '/vite.svg'), path.join(root, 'vite.svg'));
   assert.equal(safeStaticPath(root, '/../server/app.js'), null);
   assert.equal(safeStaticPath(root, '/%2e%2e/package.json'), null);
+});
+
+async function activeWeek(app) {
+  const created = await post(app, '/api/pathways', {
+    profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: 'mugs for the trip' },
+  });
+  const cookie = cookieFrom(created);
+  await post(app, '/api/plan', { pathwayIds: ['path-1'] }, cookie);
+  await post(app, '/api/plan/confirm', {}, cookie);
+  return cookie;
+}
+
+test('a step opens into a lesson you can answer and finish', async () => {
+  await withApp(async (app) => {
+    const created = await post(app, '/api/pathways', {
+      profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: 'mugs' },
+    });
+    const cookie = cookieFrom(created);
+    await post(app, '/api/plan', { pathwayIds: ['path-1'] }, cookie);
+    const tooSoon = await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'd1-s1' }, cookie);
+    assert.equal(tooSoon.status, 400);
+
+    await post(app, '/api/plan/confirm', {}, cookie);
+    const opened = await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'd1-s1' }, cookie);
+    assert.equal(opened.status, 200);
+    const step = (await opened.json()).plan.days[0].steps[0];
+    assert.equal(step.lesson.source, 'sample');
+    assert.ok(step.lesson.blocks.length >= 1);
+    assert.equal(step.lesson.prompts[0].id, 'p1');
+    assert.equal(step.completed, false);
+
+    const saved = await post(app, '/api/lesson', {
+      dayId: 'day-1',
+      stepId: 'd1-s1',
+      notes: { p1: 'Center the clay.', nope: 'drop me', p9: 'also drop' },
+      picks: { q9: 1 },
+      complete: true,
+    }, cookie);
+    const done = (await saved.json()).plan.days[0].steps[0];
+    assert.equal(done.completed, true);
+    assert.deepEqual(done.notes, { p1: 'Center the clay.' });
+    assert.equal(done.lesson.lead, step.lesson.lead);
+
+    const kept = await post(app, '/api/lesson', {
+      dayId: 'day-1',
+      stepId: 'd1-s1',
+      notes: { p1: 'Center the clay.' },
+    }, cookie);
+    assert.equal((await kept.json()).plan.days[0].steps[0].completed, true);
+
+    const missing = await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'd1-s9' }, cookie);
+    assert.equal(missing.status, 404);
+    const bad = await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'nope' }, cookie);
+    assert.equal(bad.status, 400);
+  });
+});
+
+test('a written lesson is kept, refreshed, and not replaced when the model is out of quota', async () => {
+  let calls = 0;
+  const ai = {
+    ...practiceAi(),
+    sampleMode: false,
+    async lesson() {
+      calls += 1;
+      if (calls === 3) {
+        throw httpError(502, 'Gemini is out of quota for this key. Check the key in Google AI Studio, then try again.');
+      }
+      return {
+        lead: `Lesson ${calls}`,
+        blocks: [{ heading: 'Point', body: 'Use one small piece of pottery and notice what your hands do.' }],
+        prompts: [{ label: 'What did your hands do?' }],
+        checks: [],
+      };
+    },
+  };
+
+  await withApp(async (app) => {
+    const cookie = await activeWeek(app);
+    const firstBody = await (await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'd1-s2' }, cookie)).json();
+    assert.equal(firstBody.plan.days[0].steps[1].lesson.lead, 'Lesson 1');
+    assert.equal(firstBody.plan.days[0].steps[1].lesson.source, 'model');
+
+    const again = await post(app, '/api/lesson', { dayId: 'day-1', stepId: 'd1-s2' }, cookie);
+    assert.equal((await again.json()).plan.days[0].steps[1].lesson.lead, 'Lesson 1');
+    assert.equal(calls, 1);
+
+    const refreshed = await post(app, '/api/lesson', {
+      dayId: 'day-1',
+      stepId: 'd1-s2',
+      refresh: true,
+      notes: { p1: 'They slipped.' },
+    }, cookie);
+    const step = (await refreshed.json()).plan.days[0].steps[1];
+    assert.equal(step.lesson.lead, 'Lesson 2');
+    assert.deepEqual(step.notes, { p1: 'They slipped.' });
+
+    const blocked = await post(app, '/api/lesson', {
+      dayId: 'day-1',
+      stepId: 'd1-s2',
+      refresh: true,
+    }, cookie);
+    assert.equal(blocked.status, 502);
+    const still = await app(new Request('http://127.0.0.1/api/state', { headers: { cookie } }));
+    const kept = (await still.json()).plan.days[0].steps[1];
+    assert.equal(kept.lesson.lead, 'Lesson 2');
+    assert.deepEqual(kept.notes, { p1: 'They slipped.' });
+  }, ai);
+});
+
+test('courses stay on the phone, and the feed can add one activity', async () => {
+  await withApp(async (app) => {
+    const started = await post(app, '/api/pathways', {
+      profile: { topic: 'Pottery', level: 'beginner', timeCommitment: '30min', motivation: 'mugs' },
+    });
+    const cookie = cookieFrom(started);
+    await post(app, '/api/plan', { pathwayIds: ['path-2'] }, cookie);
+    const confirmed = await (await post(app, '/api/plan/confirm', {}, cookie)).json();
+    assert.equal(confirmed.courses.length, 1);
+    assert.equal(confirmed.activeCourseId, 'course-1');
+    assert.equal(confirmed.courses[0].topic, 'Pottery');
+
+    const blocked = await post(app, '/api/pathways', {
+      profile: { topic: 'Knitting', level: 'beginner', timeCommitment: '30min', motivation: '' },
+    }, cookie);
+    assert.equal(blocked.status, 409);
+
+    const shelved = await (await post(app, '/api/courses/new', {}, cookie)).json();
+    assert.equal(shelved.plan, null);
+    assert.equal(shelved.courses.length, 1);
+    assert.equal(shelved.pausedCourseId, 'course-1');
+
+    const returned = await (await post(app, '/api/courses/open', { courseId: shelved.pausedCourseId }, cookie)).json();
+    assert.equal(returned.plan.topic, 'Pottery');
+    assert.equal(returned.pausedCourseId, null);
+    const shelvedAgain = await (await post(app, '/api/courses/new', {}, cookie)).json();
+    assert.equal(shelvedAgain.pausedCourseId, 'course-1');
+
+    await post(app, '/api/pathways', {
+      profile: { topic: 'Knitting', level: 'beginner', timeCommitment: '30min', motivation: 'scarves' },
+    }, cookie);
+    await post(app, '/api/plan', { pathwayIds: ['path-1'] }, cookie);
+    const second = await (await post(app, '/api/plan/confirm', {}, cookie)).json();
+    assert.equal(second.plan.topic, 'Knitting');
+    assert.equal(second.courses.length, 2);
+    assert.equal(second.activeCourseId, 'course-2');
+    assert.equal(second.pausedCourseId, null);
+
+    const back = await (await post(app, '/api/courses/open', { courseId: 'course-1' }, cookie)).json();
+    assert.equal(back.plan.topic, 'Pottery');
+    assert.equal(back.activeCourseId, 'course-1');
+
+    const feed = await (await post(app, '/api/feed', {}, cookie)).json();
+    assert.ok(feed.feed.length >= 2);
+    assert.ok(feed.feed.some((item) => item.topic === 'Pottery'));
+    assert.ok(feed.feed.some((item) => item.topic === 'Knitting'));
+    const before = feed.plan.days[0].steps.length;
+    const taken = await (await post(app, '/api/feed/take', { feedId: feed.feed[0].id }, cookie)).json();
+    assert.equal(taken.focus.dayId, 'day-1');
+    assert.equal(taken.plan.days[0].steps.length, before + 1);
+    assert.equal(taken.feed.length, feed.feed.length - 1);
+
+    const skipped = await (await post(app, '/api/feed/skip', { feedId: taken.feed[0].id }, cookie)).json();
+    assert.equal(skipped.feed.length, taken.feed.length - 1);
+
+    const left = await (await post(app, '/api/courses/leave', {}, cookie)).json();
+    assert.equal(left.plan.topic, 'Knitting');
+    assert.equal(left.courses.length, 1);
+  });
 });

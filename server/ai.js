@@ -1,6 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { httpError } from './http.js';
 import { extractJson, normalizePathways, normalizePlan } from './json.js';
+import {
+  backupLesson,
+  lessonErrorBlocks,
+  lessonFromModel,
+  lessonPrompt,
+  mockLesson,
+  planContext,
+} from './lesson.js';
+import { feedPrompt } from './library.js';
 
 const MODEL = 'gemini-2.5-flash';
 
@@ -187,6 +196,7 @@ Chosen pathways:
 ${focus}
 
 Each day needs 2 to 4 steps that fit inside ${profile.timeCommitment}.
+detail is a one-sentence preview. The activity itself is written later, inside the app.
 For url, include a real https link only when you are confident it exists. Otherwise use an empty string. Never invent a URL.
 Return ONLY raw JSON:
 {
@@ -229,7 +239,7 @@ async function liveChat(model, history, message, plan) {
   const historyWithPlan = [
     {
       role: 'user',
-      parts: [{ text: `The learner is following this plan. Answer briefly and practically, and stay on the plan.\n\n${JSON.stringify(plan).slice(0, 12000)}` }],
+      parts: [{ text: `The learner is following this plan. Answer briefly and practically, and stay on the plan.\n\n${planContext(plan)}` }],
     },
     { role: 'model', parts: [{ text: 'I will use that plan as context.' }] },
     ...validHistory,
@@ -250,6 +260,7 @@ export function createAi() {
       plan: async (profile, selected) => mockPlan(profile, selected),
       revise: async (plan, profile, feedback) => mockRevise(plan, profile, feedback),
       chat: async (history, message, plan) => mockChat(history, message, plan),
+      lesson: async (profile, plan, day, step) => mockLesson(profile, plan, day, step),
     };
   }
 
@@ -269,6 +280,25 @@ export function createAi() {
     },
     chat(history, message, plan) {
       return liveChat(model, history, message, plan);
+    },
+    async lesson(profile, plan, day, step) {
+      try {
+        const raw = await complete(model, lessonPrompt(profile, plan, day, step));
+        return lessonFromModel(raw, profile, plan, day, step);
+      } catch (error) {
+        if (lessonErrorBlocks(error)) throw error;
+        console.error(error instanceof Error ? error.message : 'lesson failed');
+        return backupLesson(profile, plan, day, step);
+      }
+    },
+    async feed(seeds) {
+      try {
+        return await complete(model, feedPrompt(seeds));
+      } catch (error) {
+        if (lessonErrorBlocks(error)) throw error;
+        console.error(error instanceof Error ? error.message : 'feed failed');
+        return null;
+      }
     },
   };
 }

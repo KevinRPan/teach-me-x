@@ -15,6 +15,7 @@ const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 export default function Onboarding({
   initialProfile,
   onComplete,
+  onCancel,
   sampleMode = false,
   banner = '',
   onDismissBanner,
@@ -123,7 +124,13 @@ export default function Onboarding({
         </div>
         </div>
 
-        <div className="flex shrink-0 gap-3 border-t border-neutral-800 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-neutral-800 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {onCancel && step === 1 && (
+            <button type="button" onClick={onCancel} className="min-h-11 text-sm font-medium text-neutral-300">
+              Back to your courses
+            </button>
+          )}
+          <div className="flex gap-3">
           {step > 1 && (
             <button
               type="button"
@@ -142,6 +149,7 @@ export default function Onboarding({
             {step === 4 ? 'See directions' : 'Next'}
             <ArrowRight className="h-5 w-5" />
           </button>
+          </div>
         </div>
       </div>
     </PhoneShell>

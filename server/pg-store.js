@@ -1,5 +1,5 @@
 import { sql } from './db.js';
-import { ownerIdOk, stateFromRow } from './state.js';
+import { ownerIdOk, pathwaysColumn, stateFromRow } from './state.js';
 
 export function createPgStore(query = sql) {
   return {
@@ -33,7 +33,7 @@ export function createPgStore(query = sql) {
         [
           id,
           state.profile ? JSON.stringify(state.profile) : null,
-          JSON.stringify(state.pathways || []),
+          pathwaysColumn(state),
           JSON.stringify(state.selectedPathways || []),
           state.plan ? JSON.stringify(state.plan) : null,
           state.planStatus || null,

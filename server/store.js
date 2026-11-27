@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { emptyState, ownerIdOk, stateFromRow } from './state.js';
+import { emptyState, ownerIdOk, pathwaysColumn, stateFromRow } from './state.js';
 
 export { emptyState, ownerIdOk };
 
@@ -79,7 +79,7 @@ export function createStore(dbPath) {
     write(id, state) {
       writeRow.run(
         state.profile ? JSON.stringify(state.profile) : null,
-        JSON.stringify(state.pathways || []),
+        pathwaysColumn(state),
         JSON.stringify(state.selectedPathways || []),
         state.plan ? JSON.stringify(state.plan) : null,
         state.planStatus || null,

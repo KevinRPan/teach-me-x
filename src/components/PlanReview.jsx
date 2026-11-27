@@ -9,6 +9,7 @@ export default function PlanReview({
   onConfirm,
   onRevise,
   onReset,
+  onReturn,
   hasRevised = false,
   sampleMode = false,
   banner = '',
@@ -47,9 +48,15 @@ export default function PlanReview({
             Change something
           </button>
         )}
-        <button type="button" onClick={onReset} className="min-h-11 w-full text-sm text-neutral-500">
-          Start over
-        </button>
+        {onReturn ? (
+          <button type="button" onClick={onReturn} className="min-h-11 w-full text-sm text-neutral-400">
+            Back to your courses
+          </button>
+        ) : (
+          <button type="button" onClick={onReset} className="min-h-11 w-full text-sm text-neutral-500">
+            Start over
+          </button>
+        )}
       </div>
     </PhoneShell>
   );

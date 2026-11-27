@@ -1,3 +1,11 @@
+export const STEP_LABEL = {
+  video: 'Video',
+  article: 'Read',
+  quiz: 'Quiz',
+  exercise: 'Practice',
+  project: 'Make',
+};
+
 export function planProgress(plan) {
   const steps = plan?.days?.flatMap((day) => day.steps || []) ?? [];
   if (steps.length === 0) return 0;
@@ -7,6 +15,11 @@ export function planProgress(plan) {
 export function currentDay(plan) {
   if (!plan?.days?.length) return null;
   return plan.days.find((day) => day.steps?.some((step) => !step.completed)) || plan.days[plan.days.length - 1];
+}
+
+export function firstOpenStep(day) {
+  if (!day?.steps?.length) return null;
+  return day.steps.find((step) => !step.completed) || day.steps[0];
 }
 
 export function isWeekComplete(plan) {
