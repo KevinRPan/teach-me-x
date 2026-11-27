@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { MessageCircle, MoreHorizontal, Rows3 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { ArrowRight, MessageCircle, MoreHorizontal, Rows3 } from 'lucide-react';
 import PhoneShell from './PhoneShell';
 import PlanView from './PlanView';
 import ChatInterface from './ChatInterface';
 import StepRow from './StepRow';
+import Activity from './Activity';
 import { cn } from '../lib/utils';
-import { currentDay, isWeekComplete, planProgress } from '../lib/plan';
+import { currentDay, firstOpenStep, isWeekComplete, planProgress } from '../lib/plan';
 
 export default function Dashboard({
   plan,
@@ -13,7 +14,7 @@ export default function Dashboard({
   sampleMode,
   banner,
   onDismissBanner,
-  onToggleStep,
+  onSaveStep,
   onSend,
   onReset,
   sending,
@@ -21,12 +22,38 @@ export default function Dashboard({
   const [tab, setTab] = useState('plan');
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [session, setSession] = useState(null);
   const progress = Math.round(planProgress(plan) * 100);
   const today = currentDay(plan);
   const done = isWeekComplete(plan);
+  const openStep = today ? firstOpenStep(today) : null;
+  const remaining = today ? today.steps.filter((step) => !step.completed).length : 0;
+  const startLabel = remaining === 0
+    ? 'Review today'
+    : remaining === today?.steps.length
+      ? `Start · ${today.steps.length} steps`
+      : `Continue · ${remaining} left`;
+
+  const closeSession = useCallback(() => setSession(null), []);
+  const openSession = (dayId, stepId) => {
+    setTab('plan');
+    setMenuOpen(false);
+    setSession({ dayId, stepId });
+  };
 
   return (
     <PhoneShell locked sampleMode={sampleMode} banner={banner} onDismissBanner={onDismissBanner}>
+      {session ? (
+        <Activity
+          plan={plan}
+          dayId={session.dayId}
+          stepId={session.stepId}
+          onClose={closeSession}
+          onGoto={(stepId) => setSession({ dayId: session.dayId, stepId })}
+          onSave={onSaveStep}
+        />
+      ) : (
+      <>
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-neutral-500">This week</p>
@@ -50,7 +77,7 @@ export default function Dashboard({
           <div className="h-full overflow-y-auto">
             <div className="px-4 pb-2 pt-4">
               <div className="mb-3 flex items-end justify-between">
-                <p className="text-sm text-neutral-400">{done ? 'Week complete' : 'Keep today small'}</p>
+                <p className="text-sm text-neutral-400">{done ? 'Week complete' : 'One step at a time'}</p>
                 <p className="text-3xl font-semibold tabular-nums">{progress}%</p>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-neutral-800">
@@ -61,13 +88,23 @@ export default function Dashboard({
             {today && (
               <section className="px-4 py-3">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-300">Today</p>
-                <h2 className="mt-1 text-xl font-semibold">{today.title}</h2>
-                <div className="mt-3 space-y-2">
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">{today.title}</h2>
+                {openStep && (
+                  <button
+                    type="button"
+                    onClick={() => openSession(today.id, openStep.id)}
+                    className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 font-semibold"
+                  >
+                    {startLabel}
+                    <ArrowRight className="h-5 w-5" />
+                  </button>
+                )}
+                <div className="mt-4 space-y-2">
                   {today.steps.map((step) => (
                     <StepRow
                       key={step.id}
                       step={step}
-                      onToggle={() => onToggleStep(today.id, step.id)}
+                      onOpen={() => openSession(today.id, step.id)}
                     />
                   ))}
                 </div>
@@ -77,7 +114,7 @@ export default function Dashboard({
             <div className="px-4 pb-2 pt-4">
               <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">Full week</h2>
             </div>
-            <PlanView plan={plan} onToggleStep={onToggleStep} hideHeader startCollapsed />
+            <PlanView plan={plan} onOpenStep={openSession} hideHeader startCollapsed />
           </div>
         ) : (
           <ChatInterface messages={messages} onSend={onSend} sending={sending} />
@@ -102,6 +139,8 @@ export default function Dashboard({
           Companion
         </button>
       </nav>
+      </>
+      )}
 
       {menuOpen && (
         <div className="absolute inset-0 z-20 flex items-end bg-black/70 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={() => setMenuOpen(false)}>

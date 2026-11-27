@@ -1,5 +1,13 @@
 import { httpError } from './http.js';
 import { extractJson, normalizePathways, normalizePlan } from './json.js';
+import {
+  backupLesson,
+  lessonErrorBlocks,
+  lessonFromModel,
+  lessonPrompt,
+  mockLesson,
+  planContext,
+} from './lesson.js';
 
 const MODEL = 'gemini-2.5-flash';
 
@@ -120,6 +128,7 @@ Chosen pathways:
 ${focus}
 
 Each day needs 2 to 4 steps that fit inside ${profile.timeCommitment}.
+detail is a one-sentence preview. The activity itself is written later, inside the app.
 For url, include a real https link only when you are confident it exists. Otherwise use an empty string. Never invent a URL.
 Return ONLY raw JSON:
 {
@@ -189,6 +198,7 @@ function sampleAi() {
     plan: async (profile, selected) => mockPlan(profile, selected),
     revise: async (plan, profile, feedback) => mockRevise(plan, profile, feedback),
     chat: async (history, message, plan) => mockChat(history, message, plan),
+    lesson: async (profile, plan, day, step) => mockLesson(profile, plan, day, step),
   };
 }
 
@@ -222,7 +232,7 @@ export function createRestAi(apiKey) {
       const contents = [
         {
           role: 'user',
-          parts: [{ text: `The learner is following this plan. Answer briefly and practically, and stay on the plan.\n\n${JSON.stringify(plan).slice(0, 12000)}` }],
+          parts: [{ text: `The learner is following this plan. Answer briefly and practically, and stay on the plan.\n\n${planContext(plan)}` }],
         },
         { role: 'model', parts: [{ text: 'I will use that plan as context.' }] },
         ...(firstUser === -1 ? [] : prior.slice(firstUser)),
@@ -231,6 +241,16 @@ export function createRestAi(apiKey) {
       const text = (await generate(key, contents)).trim();
       if (!text) throw httpError(502, 'The model returned an empty reply. Try again.');
       return text.slice(0, 8000);
+    },
+    async lesson(profile, plan, day, step) {
+      try {
+        const text = await generate(key, [{ role: 'user', parts: [{ text: lessonPrompt(profile, plan, day, step) }] }]);
+        return lessonFromModel(extractJson(text), profile, plan, day, step);
+      } catch (error) {
+        if (lessonErrorBlocks(error)) throw error;
+        console.error(error instanceof Error ? error.message : 'lesson failed');
+        return backupLesson(profile, plan, day, step);
+      }
     },
   };
 }

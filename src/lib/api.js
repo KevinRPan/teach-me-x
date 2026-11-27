@@ -1,6 +1,6 @@
-async function api(path, body) {
+async function api(path, body, timeout = 30000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => controller.abort(), timeout);
   let response;
   try {
     response = await fetch(path, {
@@ -43,6 +43,8 @@ export const revisePlan = (feedback) => api('/api/plan/revise', { feedback });
 export const confirmPlan = () => api('/api/plan/confirm', {});
 
 export const toggleStep = (dayId, stepId) => api('/api/progress', { dayId, stepId });
+
+export const saveLesson = (dayId, stepId, extra = {}) => api('/api/lesson', { dayId, stepId, ...extra }, 50000);
 
 export const sendChat = (message) => api('/api/chat', { message });
 

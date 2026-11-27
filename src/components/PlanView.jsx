@@ -6,7 +6,7 @@ import StepRow from './StepRow';
 
 export default function PlanView({
   plan,
-  onToggleStep,
+  onOpenStep,
   readOnly = false,
   hideHeader = false,
   startCollapsed = false,
@@ -79,7 +79,7 @@ export default function PlanView({
                       key={step.id}
                       step={step}
                       readOnly={readOnly}
-                      onToggle={() => onToggleStep?.(day.id, step.id)}
+                      onOpen={!readOnly && onOpenStep ? () => onOpenStep(day.id, step.id) : undefined}
                     />
                   ))}
                 </div>

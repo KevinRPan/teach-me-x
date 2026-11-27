@@ -13,8 +13,8 @@ import {
   getState,
   resetPlan,
   revisePlan,
+  saveLesson,
   sendChat,
-  toggleStep,
 } from './lib/api';
 
 function viewFor(state) {
@@ -37,7 +37,6 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
-  const [savingStep, setSavingStep] = useState(false);
 
   const applyState = (state, nextView = viewFor(state)) => {
     setSampleMode(Boolean(state.sampleMode));
@@ -134,32 +133,10 @@ export default function App() {
     }
   };
 
-  const handleToggleStep = async (dayId, stepId) => {
-    if (!plan || savingStep) return;
-    const previous = plan;
-    setSavingStep(true);
-    setPlan({
-      ...plan,
-      days: plan.days.map((day) => (
-        day.id !== dayId
-          ? day
-          : {
-              ...day,
-              steps: day.steps.map((step) => (
-                step.id === stepId ? { ...step, completed: !step.completed } : step
-              )),
-            }
-      )),
-    });
-    try {
-      const state = await toggleStep(dayId, stepId);
-      setPlan(state.plan);
-    } catch (requestError) {
-      setPlan(previous);
-      setError(requestError.message);
-    } finally {
-      setSavingStep(false);
-    }
+  const handleSaveStep = async (dayId, stepId, extra = {}) => {
+    const state = await saveLesson(dayId, stepId, extra);
+    setPlan(state.plan);
+    return state;
   };
 
   const handleSend = async (message) => {
@@ -261,7 +238,7 @@ export default function App() {
         sampleMode={sampleMode}
         banner={error}
         onDismissBanner={() => setError('')}
-        onToggleStep={handleToggleStep}
+        onSaveStep={handleSaveStep}
         onSend={handleSend}
         onReset={handleReset}
         sending={sending}

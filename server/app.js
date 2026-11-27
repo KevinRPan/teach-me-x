@@ -1,5 +1,15 @@
 import { httpError } from './http.js';
 import { emptyState } from './state.js';
+import {
+  acceptLesson,
+  backupLesson,
+  cleanWork,
+  findStep,
+  lessonErrorBlocks,
+  mockLesson,
+  validStepAddress,
+  writeStep,
+} from './lesson.js';
 
 const COOKIE = 'lc_session';
 const LEVELS = new Set(['beginner', 'intermediate', 'advanced']);
@@ -8,6 +18,17 @@ const HOUR = 60 * 60 * 1000;
 const AI_LIMIT = 40;
 
 const buckets = new Map();
+const lessonFlights = new Map();
+
+function singleFlight(key, fn) {
+  const existing = lessonFlights.get(key);
+  if (existing) return existing;
+  const promise = Promise.resolve().then(fn).finally(() => {
+    if (lessonFlights.get(key) === promise) lessonFlights.delete(key);
+  });
+  lessonFlights.set(key, promise);
+  return promise;
+}
 
 function clip(value, max) {
   if (typeof value !== 'string') return '';
@@ -268,6 +289,73 @@ export function createApp({ store, ai, now = () => Date.now(), identify, practic
         const plan = toggleStep(state.plan, body.dayId, body.stepId);
         const next = { ...state, plan };
         await store.write(sessionId, next);
+        return json(200, viewState(next, ai.sampleMode), cookies);
+      }
+
+      if (pathname === '/api/lesson') {
+        if (!state.plan || state.planStatus !== 'active') {
+          throw httpError(400, 'Start the plan before opening a step.');
+        }
+        if (!validStepAddress(body.dayId, body.stepId)) {
+          throw httpError(400, 'That step is not in this plan.');
+        }
+        if (body.notes !== undefined && (!body.notes || typeof body.notes !== 'object' || Array.isArray(body.notes))) {
+          throw httpError(400, 'Notes should be an object.');
+        }
+        if (body.picks !== undefined && (!body.picks || typeof body.picks !== 'object' || Array.isArray(body.picks))) {
+          throw httpError(400, 'Answers should be an object.');
+        }
+        const located = findStep(state.plan, body.dayId, body.stepId);
+        if (!located.step) throw httpError(404, 'That step is not in this plan.');
+
+        const produce = async () => {
+          if (!ai.sampleMode) charge(sessionId, now(), clientAddress(request));
+          try {
+            if (typeof ai.lesson === 'function') {
+              const created = acceptLesson(await ai.lesson(state.profile, state.plan, located.day, located.step));
+              if (created) return created;
+            }
+          } catch (error) {
+            if (lessonErrorBlocks(error)) throw error;
+            console.error(error instanceof Error ? error.message : 'lesson failed');
+          }
+          return ai.sampleMode
+            ? mockLesson(state.profile, state.plan, located.day, located.step)
+            : backupLesson(state.profile, state.plan, located.day, located.step);
+        };
+
+        const lesson = located.step.lesson && body.refresh !== true
+          ? located.step.lesson
+          : await (body.refresh === true
+            ? produce()
+            : singleFlight(`${sessionId}:${body.dayId}:${body.stepId}`, produce));
+
+        const fresh = await store.read(sessionId);
+        if (!fresh.plan || fresh.planStatus !== 'active') {
+          throw httpError(400, 'Start the plan before opening a step.');
+        }
+        const current = findStep(fresh.plan, body.dayId, body.stepId);
+        if (!current.step) throw httpError(404, 'That step is not in this plan.');
+
+        const patch = {};
+        if (!current.step.lesson || body.refresh === true) patch.lesson = lesson;
+        const lessonForWork = patch.lesson || current.step.lesson;
+        if (body.notes !== undefined || body.picks !== undefined) {
+          const work = cleanWork(
+            lessonForWork,
+            body.notes !== undefined ? body.notes : current.step.notes,
+            body.picks !== undefined ? body.picks : current.step.picks,
+          );
+          if (body.notes !== undefined) patch.notes = work.notes;
+          if (body.picks !== undefined) patch.picks = work.picks;
+        }
+        if (body.complete === true) patch.completed = true;
+
+        const plan = Object.keys(patch).length
+          ? writeStep(fresh.plan, body.dayId, body.stepId, patch)
+          : fresh.plan;
+        const next = { ...fresh, plan };
+        if (plan !== fresh.plan) await store.write(sessionId, next);
         return json(200, viewState(next, ai.sampleMode), cookies);
       }
 
